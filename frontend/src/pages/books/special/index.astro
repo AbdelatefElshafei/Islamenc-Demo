@@ -1,0 +1,171 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../../i18n/utils";
+import { sanitizeSlug } from "../../../utils/slugs";
+
+export const prerender = true;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+let books: any[] = [];
+let error: string | null = null;
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/with-languages`,
+  );
+  if (response.ok) {
+    books = await response.json();
+    books = books.filter((b) => b.type === "superbook");
+  } else {
+    error = lang === "ar" ? "فشل في تحميل الكتب" : "Failed to load books";
+  }
+} catch (e) {
+  error = lang === "ar" ? "النظام لا يستجيب" : "System not responding";
+}
+---
+
+<Layout title={`${t("books.selected")} - ${t("hero.title_span")}`}>
+  <main class="container">
+    <header class="header">
+      <div class="badge">{t("books.selected")}</div>
+      <h1>{t("books.selected")}</h1>
+      <p>{t("feature.selected_books.desc")}</p>
+    </header>
+
+    {error && <p class="error">{error}</p>}
+
+    <div class="books-grid">
+      {
+        books.map((book) => (
+          <a
+            href={translatePath(`/books/special/${sanitizeSlug(book.slug)}`)}
+            class="book-card special-card"
+          >
+            <div class="book-info">
+              <h2>{book.title}</h2>
+              {book.description && (
+                <p>{book.description.substring(0, 150)}...</p>
+              )}
+            </div>
+          </a>
+        ))
+      }
+    </div>
+  </main>
+</Layout>
+
+<style
+  define:vars={{
+    textAlign: Astro.url.pathname.startsWith("/en") ? "left" : "right",
+  }}
+>
+  .container {
+    max-width: 1400px;
+    margin: 80px auto;
+    padding: 0 20px;
+    min-height: 70vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--primary-green);
+    color: white;
+    padding: 6px 18px;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+  h1 {
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
+    color: var(--primary-green);
+    margin-bottom: 15px;
+    font-weight: 900;
+  }
+  .header p {
+    font-size: 1.25rem;
+    color: #4b5563;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 32px;
+  }
+  .book-card {
+    background: white;
+    border-radius: 24px;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(to bottom, #fff, #fffdf9);
+  }
+  .book-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(212, 175, 55, 0.15);
+    border-color: var(--accent-gold);
+  }
+  .book-info {
+    padding: 35px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: var(--textAlign);
+  }
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    color: var(--primary-green);
+    line-height: 1.4;
+    font-weight: 800;
+  }
+  p {
+    font-size: 1.05rem;
+    color: #4b5563;
+    margin-bottom: 24px;
+    line-height: 1.7;
+    flex: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  .languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+  }
+  .lang-badge {
+    background: rgba(212, 175, 55, 0.1);
+    color: var(--primary-green);
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    padding: 40px;
+    background: white;
+    border-radius: 20px;
+  }
+</style>
