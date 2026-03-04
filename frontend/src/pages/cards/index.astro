@@ -1,0 +1,158 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../i18n/utils";
+import { sanitizeSlug } from "../../utils/slugs";
+
+export const prerender = true;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+let cards: any[] = [];
+let error: string | null = null;
+
+try {
+  const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/cards/list`);
+  if (response.ok) {
+    cards = await response.json();
+  } else {
+    error = lang === "ar" ? "فشل في تحميل البطاقات" : "Failed to load cards";
+  }
+} catch (e) {
+  error = lang === "ar" ? "النظام لا يستجيب" : "System not responding";
+}
+---
+
+<Layout title={`${t("cards.title")} - ${t("hero.title_span")}`}>
+  <main class="container">
+    <header class="header">
+      <h1>{t("cards.title")}</h1>
+      <p>{t("cards.description")}</p>
+    </header>
+
+    {error && <p class="error">{error}</p>}
+
+    <div class="cards-grid">
+      {
+        cards.map((card) => (
+          <a
+            href={translatePath(`/cards/${sanitizeSlug(card.slug)}`)}
+            class="k-card"
+            dir={lang === "ar" ? "rtl" : "ltr"}
+          >
+            <div class="card-ornament top-right" />
+            <div class="k-card-content">
+              <h2>{card.title}</h2>
+              <div class="k-card-footer">
+                <span>
+                  {lang === "ar" ? "عرض التفاصيل ⮕" : "View Details ➡"}
+                </span>
+              </div>
+            </div>
+            <div class="card-ornament bottom-left" />
+          </a>
+        ))
+      }
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .container {
+    max-width: 1400px;
+    margin: 60px auto;
+    padding: 0 20px;
+    min-height: 70vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+  h1 {
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
+    color: var(--primary-green);
+    margin-bottom: 12px;
+    font-weight: 800;
+  }
+  .header p {
+    font-size: 1.25rem;
+    color: #4b5563;
+  }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 32px;
+  }
+  .k-card {
+    position: relative;
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid rgba(6, 78, 59, 0.08);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .k-card:hover {
+    border-color: var(--accent-gold);
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(6, 78, 59, 0.1);
+  }
+  .card-ornament {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    opacity: 0.1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l5 15h15l-12 9 5 15-13-10-13 10 5-15-12-9h15z' fill='%23064e3b'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    transition: opacity 0.3s;
+  }
+  .k-card:hover .card-ornament {
+    opacity: 0.2;
+  }
+  .top-right {
+    top: -10px;
+    right: -10px;
+  }
+  .bottom-left {
+    bottom: -10px;
+    left: -10px;
+    transform: rotate(180deg);
+  }
+
+  .k-card-content {
+    padding: 32px 24px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 1;
+  }
+  h2 {
+    font-size: 1.35rem;
+    color: var(--primary-green);
+    margin: 0;
+    line-height: 1.5;
+    font-weight: 700;
+  }
+  .k-card-footer {
+    margin-top: 24px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    font-weight: 600;
+  }
+</style>
