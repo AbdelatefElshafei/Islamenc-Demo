@@ -1,0 +1,203 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getLangFromUrl, useTranslations } from "../../i18n/utils";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/quran/surahs`,
+  );
+  const surahs = await response.json();
+  return surahs.map((surah: any) => ({
+    params: { id: surah.surahNo.toString() },
+  }));
+}
+
+const { id } = Astro.params;
+const { lang: propLang } = Astro.props;
+const lang = propLang || getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+
+let surah: any = null;
+let error: string | null = null;
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/quran/surahs/${id}`,
+  );
+  if (response.ok) {
+    surah = await response.json();
+  } else {
+    error = lang === "ar" ? "السورة غير موجودة" : "Surah not found";
+  }
+} catch (e) {
+  error = lang === "ar" ? "فشل في تحميل السورة" : "Failed to load Surah";
+}
+
+if (!surah && !error) {
+  return Astro.redirect("/404");
+}
+---
+
+<Layout
+  title={surah ? `${surah.surahName} - ${t("nav.quran")}` : t("nav.quran")}
+>
+  <main class="quran-container">
+    {
+      error ? (
+        <div class="error">{error}</div>
+      ) : (
+        <>
+          <header class="surah-header">
+            <h1>{surah.surahName}</h1>
+            <p class="uthmani-name">{surah.arUthmaniName}</p>
+            <div class="surah-info">
+              <span>
+                {lang === "ar"
+                  ? `سورة رقم ${surah.surahNo}`
+                  : `Surah No. ${surah.surahNo}`}
+              </span>
+              <span>
+                {surah.ayasCount} {t("quran.ayahs")}
+              </span>
+            </div>
+          </header>
+
+          <div class="ayas-list">
+            {surah.ayas.map((aya: any) => (
+              <div class="aya-card" id={`aya-${aya.aya_no}`}>
+                <div class="aya-number">{aya.aya_no}</div>
+                <p class="aya-text">{aya.text}</p>
+                {aya.translations.map((tr: any) => (
+                  <div class="aya-translation">
+                    <span class="lang-code">{tr.language.toUpperCase()}</span>
+                    <p>{tr.text}</p>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )
+    }
+  </main>
+</Layout>
+
+<style>
+  .quran-container {
+    max-width: 900px;
+    margin: 60px auto;
+    padding: 20px;
+    min-height: 70vh;
+  }
+  .surah-header {
+    text-align: center;
+    margin-bottom: 60px;
+    padding-bottom: 30px;
+    position: relative;
+  }
+  .surah-header::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 25%;
+    right: 25%;
+    height: 2px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--accent-gold),
+      transparent
+    );
+  }
+  h1 {
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
+    color: var(--primary-green);
+    margin-bottom: 10px;
+    font-weight: 800;
+  }
+  .uthmani-name {
+    font-size: clamp(2rem, 5vw, 3rem);
+    color: #4b5563;
+    font-family: "Amiri", serif;
+    margin-bottom: 15px;
+  }
+  .surah-info {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    color: var(--accent-gold);
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .ayas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+  .aya-card {
+    background: white;
+    padding: 40px;
+    border-radius: 24px;
+    border: 1px solid rgba(6, 78, 59, 0.05);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.03);
+    scroll-margin-top: 100px;
+    transition: transform 0.3s;
+  }
+  .aya-card:target {
+    border-color: var(--accent-gold);
+    background-color: #fffbeb;
+    transform: scale(1.01);
+  }
+  .aya-number {
+    width: 40px;
+    height: 40px;
+    background: var(--primary-green);
+    color: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    margin-bottom: 24px;
+  }
+  .aya-text {
+    font-size: 2rem;
+    line-height: 2.2;
+    text-align: right;
+    margin-bottom: 32px;
+    color: var(--text-main);
+    direction: rtl;
+    font-family: "Cairo", sans-serif;
+  }
+  .aya-translation {
+    border-top: 1px solid rgba(6, 78, 59, 0.05);
+    padding-top: 24px;
+    margin-top: 24px;
+  }
+  .lang-code {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--primary-green);
+    background: rgba(6, 78, 59, 0.05);
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    display: inline-block;
+  }
+  .aya-translation p {
+    font-size: 1.15rem;
+    color: #4b5563;
+    line-height: 1.8;
+    margin: 0;
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    padding: 60px;
+    background: white;
+    border-radius: 24px;
+    font-weight: 600;
+  }
+</style>
