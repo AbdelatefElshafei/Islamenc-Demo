@@ -1,0 +1,18 @@
+---
+import SurahDetail from "../../quran/[id].astro";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/quran/surahs`,
+  );
+  const surahs = await response.json();
+  return surahs.map((surah: any) => ({
+    params: { id: surah.surahNo.toString() },
+    props: { lang: "en" },
+  }));
+}
+---
+
+<SurahDetail />
