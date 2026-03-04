@@ -1,0 +1,337 @@
+---
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../i18n/utils";
+
+const { title, alternates = [], canonical } = Astro.props;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+// Default site URL for alternates (adjust if needed)
+const siteUrl = "https://islamenc.com"; // Replace with your actual domain
+---
+
+<!doctype html>
+<html
+  lang={lang}
+  dir={lang === "ar" || lang === "ur" || lang === "fa" ? "rtl" : "ltr"}
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="description"
+      content="Islam Encyclopedia - Authenticated Islamic Knowledge"
+    />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+
+    {
+      canonical && (
+        <link rel="canonical" href={new URL(canonical, siteUrl).href} />
+      )
+    }
+
+    {
+      alternates.map((alt) => (
+        <link
+          rel="alternate"
+          hreflang={alt.lang}
+          href={new URL(alt.href, siteUrl).href}
+        />
+      ))
+    }
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;600;700&display=swap"
+    />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-content">
+        <a href={translatePath("/")} class="logo">
+          <svg class="logo-icon" viewBox="0 0 40 40" fill="none">
+            <path d="M20 5L25 15H15L20 5Z" fill="var(--accent-gold)"></path>
+            <path d="M20 35L15 25H25L20 35Z" fill="var(--accent-gold)"></path>
+            <path d="M5 20L15 15V25L5 20Z" fill="var(--accent-gold)"></path>
+            <path d="M35 20L25 25V15L35 20Z" fill="var(--accent-gold)"></path>
+            <circle cx="20" cy="20" r="5" fill="var(--primary-green)"></circle>
+          </svg>
+          <span class="logo-text">{t("hero.title_span")}</span>
+        </a>
+        <nav class="main-nav">
+          <a href={translatePath("/books")}>{t("nav.library")}</a>
+          <a href={translatePath("/quran")}>{t("nav.quran")}</a>
+          <a href={translatePath("/cards")}>{t("nav.cards")}</a>
+          <a href={translatePath("/search")} class="search-link"
+            >{t("nav.search")}</a
+          >
+
+          <div class="lang-switcher">
+            {
+              lang === "ar" ? (
+                <a href="/en" class="lang-link">
+                  English
+                </a>
+              ) : (
+                <a href="/" class="lang-link">
+                  العربية
+                </a>
+              )
+            }
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <div class="page-wrapper">
+      <slot />
+    </div>
+
+    <footer class="site-footer">
+      <div class="footer-decoration">
+        <svg
+          width="100%"
+          height="40"
+          viewBox="0 0 1200 40"
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M0 40C0 40 150 0 300 0C450 0 600 40 600 40C600 40 750 0 900 0C1050 0 1200 40 1200 40V0H0V40Z"
+            fill="white"></path>
+        </svg>
+      </div>
+      <div class="footer-content">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <h3>{t("hero.title_span")}</h3>
+            <p>{t("footer.description")}</p>
+          </div>
+          <div class="footer-links">
+            <h4>{t("footer.quick_links")}</h4>
+            <a href={translatePath("/books")}>{t("nav.library")}</a>
+            <a href={translatePath("/quran")}>{t("nav.quran")}</a>
+            <a href={translatePath("/cards")}>{t("nav.cards")}</a>
+          </div>
+          <div class="footer-contact">
+            <h4>{t("footer.contact")}</h4>
+            <p>{t("feature.books.desc")}</p>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>
+            © {new Date().getFullYear()}
+            {t("hero.title_span")} - {t("footer.rights")}
+          </p>
+          <div class="islamic-motif"></div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --primary-green: #064e3b;
+    --accent-gold: #d4af37;
+    --emerald-deep: #065f46;
+    --light-cream: #fafaf9;
+    --text-main: #1e293b;
+  }
+
+  html {
+    font-family: "Cairo", "Inter", system-ui, sans-serif;
+    background: var(--light-cream);
+    color: var(--text-main);
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .site-header {
+    background: white;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+  }
+
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .logo-text {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--primary-green);
+  }
+
+  .main-nav {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .main-nav a {
+    text-decoration: none;
+    color: #4b5563;
+    font-weight: 600;
+    transition: color 0.3s;
+  }
+
+  .main-nav a:hover {
+    color: var(--primary-green);
+  }
+
+  .main-nav .search-link {
+    background: var(--primary-green);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 50px;
+  }
+
+  .main-nav .search-link:hover {
+    background: var(--emerald-deep);
+    color: white;
+  }
+
+  .lang-switcher {
+    border-left: 1px solid #e2e8f0;
+    padding-left: 1.5rem;
+    margin-left: 0.5rem;
+  }
+
+  .lang-link {
+    font-size: 0.9rem;
+    color: var(--accent-gold) !important;
+    border: 1px solid var(--accent-gold);
+    padding: 4px 12px;
+    border-radius: 8px;
+    transition: all 0.3s;
+  }
+
+  .lang-link:hover {
+    background: var(--accent-gold);
+    color: white !important;
+  }
+
+  .page-wrapper {
+    flex: 1;
+  }
+
+  .site-footer {
+    background: var(--primary-green);
+    color: white;
+    position: relative;
+    padding-top: 2rem;
+  }
+
+  .footer-decoration {
+    position: absolute;
+    top: -39px;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    overflow: hidden;
+  }
+
+  .footer-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 4rem 2rem 2rem;
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 3rem;
+  }
+
+  .footer-brand h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--accent-gold);
+  }
+
+  .footer-brand p {
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.6;
+    max-width: 400px;
+  }
+
+  .footer-links h4,
+  .footer-contact h4 {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .footer-links a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+
+  .footer-links a:hover {
+    color: var(--accent-gold);
+  }
+
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 2rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .footer-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .main-nav {
+      gap: 1rem;
+    }
+  }
+</style>
