@@ -1,0 +1,361 @@
+---
+import Layout from "../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../i18n/utils";
+
+export const prerender = true;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+---
+
+<Layout title={t("hero.title_span")}>
+  <main>
+    <div class="decorative-bg"></div>
+    <div class="content-wrapper">
+      <div class="hero">
+        <div class="ornament animate-in">
+          <svg
+            width="120"
+            height="40"
+            viewBox="0 0 120 40"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M60 0C60 0 52 15 40 15C28 15 15 8 15 8C15 8 22 20 15 32C8 44 0 40 0 40C0 40 12 40 20 32C28 24 35 15 45 15C55 15 60 20 60 20C60 20 65 15 75 15C85 15 92 24 100 32C108 40 120 40 120 40C120 40 112 44 105 32C98 20 105 8 105 8C105 8 92 15 80 15C68 15 60 0 60 0Z"
+              fill="#D4AF37"
+              fill-opacity="0.3"></path>
+          </svg>
+        </div>
+        <h1 class="animate-in">
+          {t("hero.title")}
+          <span class="text-gradient">{t("hero.title_span")}</span>
+        </h1>
+        <p class="subtitle animate-in" style="animation-delay: 0.1s">
+          {t("hero.subtitle")}
+        </p>
+
+        <form
+          action={translatePath("/search")}
+          method="get"
+          class="search-box animate-in"
+          style="animation-delay: 0.2s"
+        >
+          <div class="search-input-wrapper">
+            <input
+              type="text"
+              name="q"
+              placeholder={t("search.placeholder")}
+              required
+            />
+            <button type="submit">
+              <span class="search-icon">🔍</span>
+              {t("search.button")}
+            </button>
+          </div>
+        </form>
+
+        <div class="features animate-in" style="animation-delay: 0.3s">
+          <a href={translatePath("/books")} class="feature-card">
+            <div class="card-border"></div>
+            <h2>{t("feature.books.title")}</h2>
+            <p>{t("feature.books.desc")}</p>
+            <span class="explore-link"
+              >{t("feature.books.link")} {lang === "ar" ? "⮕" : "➡"}</span
+            >
+          </a>
+
+          <a href={translatePath("/quran")} class="feature-card highlighted">
+            <div class="card-border"></div>
+            <h2>{t("feature.quran.title")}</h2>
+            <p>{t("feature.quran.desc")}</p>
+            <span class="explore-link"
+              >{t("feature.quran.link")} {lang === "ar" ? "⮕" : "➡"}</span
+            >
+          </a>
+
+          <a
+            href={translatePath("/books/special")}
+            class="feature-card special-feature"
+          >
+            <div class="card-border"></div>
+            <h2>{t("feature.selected_books.title")}</h2>
+            <p>{t("feature.selected_books.desc")}</p>
+            <span class="explore-link"
+              >{t("feature.selected_books.link")}
+              {lang === "ar" ? "⮕" : "➡"}</span
+            >
+          </a>
+
+          <a href={translatePath("/cards")} class="feature-card">
+            <div class="card-border"></div>
+            <h2>{t("feature.places.title")}</h2>
+            <p>{t("feature.places.desc")}</p>
+            <span class="explore-link"
+              >{t("feature.places.link")} {lang === "ar" ? "⮕" : "➡"}</span
+            >
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  main {
+    position: relative;
+    margin: auto;
+    padding: 2rem;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--light-cream);
+    overflow: hidden;
+  }
+
+  .decorative-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l5.878 18.09h19.022l-15.389 11.18 5.878 18.09-15.389-11.18-15.389 11.18 5.878-18.09-15.389-11.18h19.022z' fill='%23064e3b' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .content-wrapper {
+    position: relative;
+    z-index: 1;
+    width: 1300px;
+    max-width: 100%;
+  }
+
+  .hero {
+    text-align: center;
+    width: 100%;
+  }
+
+  .ornament {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 8vw, 4rem);
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    color: var(--primary-green);
+    letter-spacing: -0.01em;
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(
+      135deg,
+      var(--primary-green) 0%,
+      var(--emerald-deep) 50%,
+      var(--accent-gold) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% auto;
+    animation: gradient-flow 6s ease infinite alternate;
+  }
+
+  @keyframes gradient-flow {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .subtitle {
+    font-size: clamp(1.1rem, 3vw, 1.3rem);
+    color: #4b5563;
+    margin-bottom: 4rem;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.8;
+  }
+
+  .search-input-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 650px;
+    margin: 0 auto 5rem;
+    display: flex;
+    background: white;
+    padding: 8px;
+    border-radius: 20px;
+    box-shadow:
+      0 20px 25px -5px rgba(0, 0, 0, 0.03),
+      0 10px 10px -5px rgba(0, 0, 0, 0.02),
+      0 0 0 1px rgba(6, 78, 59, 0.05);
+    border: 2px solid transparent;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .search-input-wrapper:focus-within {
+    border-color: var(--accent-gold);
+    box-shadow: 0 25px 50px -12px rgba(6, 78, 59, 0.1);
+    transform: translateY(-4px);
+  }
+
+  .search-box input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border: none;
+    background: transparent;
+    font-size: 1.1rem;
+    outline: none;
+    color: var(--primary-green);
+  }
+
+  .search-box button {
+    padding: 0.75rem 2.5rem;
+    border-radius: 12px;
+    border: none;
+    background: var(--primary-green);
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .search-box button:hover {
+    background: var(--emerald-deep);
+    box-shadow: 0 4px 12px rgba(6, 78, 59, 0.2);
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2.5rem;
+  }
+
+  .feature-card {
+    position: relative;
+    background: white;
+    padding: 3rem 2rem;
+    border-radius: 24px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    border: 1px solid rgba(6, 78, 59, 0.08);
+    overflow: hidden;
+  }
+
+  .card-border {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    border: 1px solid var(--accent-gold);
+    opacity: 0.15;
+    border-radius: 16px;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-12px);
+    border-color: var(--accent-gold);
+    box-shadow: 0 30px 60px -12px rgba(6, 78, 59, 0.12);
+  }
+
+  .feature-card:hover .card-border {
+    opacity: 0.4;
+  }
+
+  .feature-card.highlighted {
+    background: linear-gradient(to bottom, white, #fefce8);
+  }
+
+  .feature-card.special-feature {
+    background: linear-gradient(to bottom, #fff, #fffdf0);
+    border-color: rgba(212, 175, 55, 0.3);
+  }
+
+  .feature-card.special-feature:hover {
+    box-shadow: 0 30px 60px -12px rgba(212, 175, 55, 0.2);
+  }
+
+  .feature-card h2 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--primary-green);
+  }
+
+  .feature-card p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+
+  .explore-link {
+    margin-top: auto;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    transition: gap 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .feature-card:hover .explore-link {
+    gap: 12px;
+  }
+
+  .animate-in {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fade-in-up 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  @keyframes fade-in-up {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 640px) {
+    main {
+      padding: 1rem;
+    }
+    .search-input-wrapper {
+      flex-direction: column;
+      border-radius: 24px;
+      padding: 12px;
+      margin-bottom: 3rem;
+    }
+    .search-box button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
