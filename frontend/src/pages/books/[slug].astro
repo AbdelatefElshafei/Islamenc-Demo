@@ -1,0 +1,780 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../i18n/utils";
+import { sanitizeSlug } from "../../utils/slugs";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/with-languages`,
+  );
+  if (!response.ok) return [];
+  const books = await response.json();
+  if (!Array.isArray(books)) return [];
+
+  return books.map((book: any) => ({
+    params: { slug: sanitizeSlug(book.slug) },
+    props: { bookSlug: book.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const { bookSlug, lang: propLang } = Astro.props;
+const lang = propLang || getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+const lookupSlug = bookSlug || slug;
+
+let book = null;
+let phrases = [];
+let availableLanguages = [];
+
+try {
+  const bookRes = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/slug/${encodeURIComponent(lookupSlug)}`,
+  );
+  if (bookRes.ok) {
+    book = await bookRes.json();
+    availableLanguages = book.available_languages || [
+      { iso: "ar", native_name: "عربي" },
+    ];
+  }
+
+  if (book) {
+    const contentRes = await fetch(
+      `${import.meta.env.PUBLIC_API_URL}/books/${book.projectId}/arabic-phrases`,
+    );
+    if (contentRes.ok) {
+      const contentData = await contentRes.json();
+      phrases =
+        contentData.phrases?.sort(
+          (a, b) => (a.group_order || 0) - (b.group_order || 0),
+        ) || [];
+    }
+  }
+} catch (e) {
+  console.error(`Error loading book ${slug}:`, e);
+}
+
+if (!book) return Astro.redirect("/404");
+
+const alternates = availableLanguages.map((l: any) => ({
+  lang: l.iso,
+  href: l.iso === "ar" ? `/books/${slug}` : `/books/${slug}/${l.iso}`,
+}));
+
+// Grouping logic: Combine consecutive non-heading phrases into single paragraphs
+const groupedPhrases = [];
+let currentGroup = null;
+
+for (const phrase of phrases) {
+  const isHeading = phrase.tag === "heading1" || phrase.text_type === "h1";
+
+  if (isHeading) {
+    if (currentGroup) {
+      groupedPhrases.push(currentGroup);
+      currentGroup = null;
+    }
+    groupedPhrases.push({ ...phrase, isHeading: true });
+  } else {
+    if (!currentGroup) {
+      currentGroup = {
+        ...phrase,
+        isHeading: false,
+        text: phrase.text,
+      };
+    } else {
+      currentGroup.text += " " + phrase.text;
+    }
+  }
+}
+if (currentGroup) groupedPhrases.push(currentGroup);
+---
+
+<Layout
+  title={`${book.title} - ${t("hero.title_span")}`}
+  alternates={alternates}
+>
+  <main class="book-detail-page">
+    <div class="book-hero">
+      <div class="hero-pattern"></div>
+      <div class="container">
+        <header class="book-header">
+          <div class="book-badge">{t("nav.library")}</div>
+          <h1>{book.title}</h1>
+
+          <div class="book-controls">
+            <div class="lang-selector">
+              <button class="selector-btn" id="lang-trigger">
+                <span class="icon">🌍</span>
+                <span
+                  >{
+                    availableLanguages.find((l) => l.iso === "ar")
+                      ?.native_name || "العربية"
+                  }</span
+                >
+                <span class="arrow">▾</span>
+              </button>
+              <div class="selector-menu" id="lang-menu">
+                <div class="search-box">
+                  <input
+                    type="text"
+                    id="lang-search"
+                    placeholder={lang === "ar" ? "بحث..." : "Search..."}
+                  />
+                </div>
+                <div class="menu-scroll" id="lang-list">
+                  {
+                    availableLanguages.map((l: any) => (
+                      <a
+                        href={
+                          l.iso === "ar"
+                            ? translatePath(`/books/${slug}`)
+                            : translatePath(`/books/${slug}/${l.iso}`)
+                        }
+                        class={`menu-item ${l.iso === "ar" ? "active" : ""}`}
+                        data-name={(l.native_name || l.iso).toLowerCase()}
+                      >
+                        {l.native_name || l.iso.toUpperCase()}
+                      </a>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {
+            book.description && (
+              <p class="book-description">{book.description}</p>
+            )
+          }
+        </header>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="manuscript-layout">
+        <aside class="book-toc">
+          <div class="toc-sticky">
+            <div class="toc-header">
+              <svg
+                class="toc-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                ><path
+                  d="M4 6h16M4 12h16M4 18h7"
+                  stroke-width="2"
+                  stroke-linecap="round"></path></svg
+              >
+              <h3>{lang === "ar" ? "فهرس الكتاب" : "Table of Contents"}</h3>
+            </div>
+            <nav class="toc-nav">
+              {
+                phrases
+                  .filter((p) => p.tag === "heading1" || p.text_type === "h1")
+                  .map((p) => (
+                    <a href={`#phrase-${p.phrase_id}`} class="toc-link">
+                      <span class="toc-dot" />
+                      {p.text}
+                    </a>
+                  ))
+              }
+            </nav>
+          </div>
+        </aside>
+
+        <div class="phrases-stream">
+          {
+            groupedPhrases.map((phrase: any) => {
+              const isHeading = phrase.isHeading;
+              return (
+                <div
+                  class={`phrase-card ${isHeading ? "is-heading" : "is-paragraph"}`}
+                  id={`phrase-${phrase.phrase_id}`}
+                >
+                  <div class="card-ornament tl" />
+                  <div class="card-ornament tr" />
+                  <div class="card-ornament bl" />
+                  <div class="card-ornament br" />
+
+                  {!isHeading && (
+                    <div class="phrase-actions">
+                      <button
+                        class="action-icon"
+                        title="Copy"
+                        onclick={`navigator.clipboard.writeText("${phrase.text}")`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <rect
+                            x="9"
+                            y="9"
+                            width="13"
+                            height="13"
+                            rx="2"
+                            ry="2"
+                          />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                      </button>
+                      <button
+                        class="action-icon"
+                        title="Share"
+                        onclick={`if(navigator.share) navigator.share({title: "${book.title}", text: "${phrase.text}", url: window.location.href + "#phrase-${phrase.phrase_id}"})`}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                          <polyline points="16 6 12 2 8 6" />
+                          <line x1="12" y1="2" x2="12" y2="15" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
+                  {isHeading ? (
+                    <div class="heading-wrapper">
+                      <div class="heading-ornament left" />
+                      <h2>{phrase.text}</h2>
+                      <div class="heading-ornament right" />
+                    </div>
+                  ) : (
+                    <div class="paragraph-content">
+                      <p>{phrase.text}</p>
+                      <div class="phrase-footer">
+                        <span class="phrase-hash">#</span>
+                        <span class="phrase-id">{phrase.phrase_id}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          }
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  const trigger = document.getElementById("lang-trigger");
+  const menu = document.getElementById("lang-menu");
+  const searchInput = document.getElementById("lang-search");
+  const langItems = document.querySelectorAll(".menu-item");
+
+  trigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu?.classList.toggle("show");
+    if (menu?.classList.contains("show")) {
+      (searchInput as HTMLInputElement)?.focus();
+    }
+  });
+
+  searchInput?.addEventListener("click", (e) => e.stopPropagation());
+  searchInput?.addEventListener("input", (e) => {
+    const term = (e.target as HTMLInputElement).value.toLowerCase();
+    langItems.forEach((item) => {
+      const name = item.getAttribute("data-name") || "";
+      (item as HTMLElement).style.display = name.includes(term)
+        ? "block"
+        : "none";
+    });
+  });
+
+  document.addEventListener("click", () => {
+    menu?.classList.remove("show");
+  });
+</script>
+
+<style define:vars={{ bookDir: "rtl" }}>
+  .book-detail-page {
+    background: #fdfbf7;
+    min-height: 100vh;
+    padding-bottom: 8rem;
+  }
+
+  .container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .book-hero {
+    background: linear-gradient(
+      135deg,
+      var(--primary-green) 0%,
+      var(--emerald-deep) 100%
+    );
+    color: white;
+    padding: 7rem 0 5rem;
+    position: relative;
+    z-index: 50;
+    margin-bottom: 4rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .hero-pattern {
+    position: absolute;
+    inset: 0;
+    opacity: 0.12;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 0l15 35h35L70 55l15 35-35-20-35 20 15-35L0 35h35z' fill='%23d4af37'/%3E%3C/svg%3E");
+    background-size: 100px;
+    pointer-events: none;
+  }
+
+  .book-header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+  }
+
+  .book-badge {
+    display: inline-block;
+    background: rgba(212, 175, 55, 0.15);
+    color: var(--accent-gold);
+    padding: 8px 24px;
+    border-radius: 50px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    margin-bottom: 2.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    backdrop-filter: blur(4px);
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+    font-weight: 900;
+    margin-bottom: 2.5rem;
+    line-height: 1.1;
+    color: white;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .book-controls {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 3rem;
+    z-index: 100;
+  }
+
+  .selector-btn {
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--primary-green);
+    border: 1px solid var(--accent-gold);
+    padding: 12px 28px;
+    border-radius: 16px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  .selector-btn:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    background: white;
+  }
+
+  .selector-menu {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 28px;
+    padding: 20px;
+    min-width: 300px;
+    box-shadow:
+      0 10px 25px -5px rgba(0, 0, 0, 0.1),
+      0 20px 40px -10px rgba(0, 0, 0, 0.2),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    display: none;
+    z-index: 100000;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+  }
+
+  .search-box {
+    margin-bottom: 18px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .search-box input {
+    width: 80%;
+    padding: 12px 20px;
+    border-radius: 100px;
+    border: 1px solid rgba(6, 78, 59, 0.1);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--primary-green);
+    font-weight: 600;
+    outline: none;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .search-box input:focus {
+    width: 90%;
+    border-color: var(--accent-gold);
+    background: white;
+    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.2);
+  }
+
+  .menu-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+  }
+
+  .menu-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .menu-scroll::-webkit-scrollbar-thumb {
+    background: rgba(6, 78, 59, 0.1);
+    border-radius: 10px;
+  }
+
+  .selector-menu.show {
+    display: block;
+    animation: premiumFadeIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  @keyframes premiumFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(15px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+  }
+
+  .menu-item {
+    display: block;
+    padding: 14px 20px;
+    text-decoration: none;
+    color: #374151;
+    border-radius: 14px;
+    transition: all 0.2s;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .menu-item:hover {
+    background: #fdfce8;
+    color: var(--primary-green);
+  }
+  .menu-item.active {
+    background: var(--primary-green);
+    color: white;
+  }
+
+  .book-description {
+    max-width: 850px;
+    margin: 0 auto;
+    font-size: 1.3rem;
+    line-height: 1.8;
+    opacity: 0.95;
+    color: #f1f5f9;
+  }
+
+  .manuscript-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 5rem;
+    align-items: start;
+  }
+
+  .book-toc {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 32px;
+    border: 1px solid var(--accent-gold);
+    box-shadow: 0 15px 40px rgba(6, 78, 59, 0.04);
+  }
+
+  .toc-sticky {
+    position: sticky;
+    top: 110px;
+  }
+
+  .toc-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 2rem;
+    color: var(--primary-green);
+  }
+
+  .toc-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .book-toc h3 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .toc-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .toc-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #64748b;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    transition: all 0.3s;
+    padding: 6px 0;
+  }
+
+  .toc-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-gold);
+    border-radius: 50%;
+    opacity: 0.3;
+    transition: all 0.3s;
+  }
+
+  .toc-link:hover {
+    color: var(--primary-green);
+    transform: translateX(5px);
+  }
+  .toc-link:hover .toc-dot {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+
+  .phrases-stream {
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  .phrase-card {
+    background: white;
+    border-radius: 32px;
+    padding: 4rem;
+    position: relative;
+    border: 1px solid rgba(6, 78, 59, 0.08);
+    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.02);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .phrase-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--accent-gold);
+    box-shadow: 0 30px 70px rgba(6, 78, 59, 0.08);
+  }
+
+  /* Card Ornaments */
+  .card-ornament {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--accent-gold);
+    opacity: 0.2;
+    transition: all 0.5s;
+    pointer-events: none;
+  }
+
+  .phrase-card:hover .card-ornament {
+    opacity: 0.6;
+    width: 50px;
+    height: 50px;
+  }
+
+  .tl {
+    top: 20px;
+    left: 20px;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 12px 0 0 0;
+  }
+  .tr {
+    top: 20px;
+    right: 20px;
+    border-left: 0;
+    border-bottom: 0;
+    border-radius: 0 12px 0 0;
+  }
+  .bl {
+    bottom: 20px;
+    left: 20px;
+    border-right: 0;
+    border-top: 0;
+    border-radius: 0 0 0 12px;
+  }
+  .br {
+    bottom: 20px;
+    right: 20px;
+    border-left: 0;
+    border-top: 0;
+    border-radius: 0 0 12px 0;
+  }
+
+  /* Phrase Actions */
+  .phrase-actions {
+    position: absolute;
+    top: -20px;
+    right: 40px;
+    display: flex;
+    gap: 10px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 50;
+  }
+
+  .phrase-card:hover .phrase-actions {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .action-icon {
+    background: var(--primary-green);
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--accent-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+  }
+
+  .action-icon:hover {
+    background: var(--accent-gold);
+    transform: scale(1.1) rotate(5deg);
+  }
+
+  .action-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .is-heading {
+    background: #fffdf0;
+    text-align: center;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+  }
+
+  .heading-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+  }
+
+  .heading-ornament {
+    height: 3px;
+    flex: 1;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--accent-gold),
+      transparent
+    );
+    max-width: 120px;
+    border-radius: 10px;
+  }
+
+  .is-heading h2 {
+    font-size: 2.5rem;
+    color: var(--primary-green);
+    margin: 0;
+    font-family: "Amiri", serif;
+    font-weight: 800;
+  }
+
+  .paragraph-content p {
+    font-size: 1.7rem;
+    line-height: 2.3;
+    color: #1e293b;
+    margin: 0;
+    text-align: justify;
+    direction: rtl;
+    font-family: "Cairo", sans-serif;
+  }
+
+  .phrase-footer {
+    margin-top: 2.5rem;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.3;
+  }
+
+  .phrase-hash {
+    font-weight: 900;
+    color: var(--accent-gold);
+  }
+  .phrase-id {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #94a3b8;
+  }
+
+  @media (max-width: 1100px) {
+    .manuscript-layout {
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+    .book-toc {
+      display: none;
+    }
+    .container {
+      padding: 0 1.5rem;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .phrase-card {
+      padding: 3rem 1.5rem;
+    }
+    h1 {
+      font-size: 2.2rem;
+    }
+    .paragraph-content p {
+      font-size: 1.4rem;
+    }
+  }
+</style>
