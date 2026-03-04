@@ -1,0 +1,17 @@
+---
+import CardDetail from "../../cards/[slug].astro";
+import { sanitizeSlug } from "../../../utils/slugs";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/cards/list`);
+  const cards = await response.json();
+  return cards.map((card: any) => ({
+    params: { slug: sanitizeSlug(card.slug) },
+    props: { cardSlug: card.slug, lang: "en" },
+  }));
+}
+---
+
+<CardDetail />
