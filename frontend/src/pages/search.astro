@@ -1,0 +1,427 @@
+---
+import Layout from "../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../i18n/utils";
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+---
+
+<Layout title={`${t("nav.search")} - ${t("hero.title_span")}`}>
+  <main class="search-container">
+    <div class="search-header">
+      <h1>{t("search.page_title")}</h1>
+      <form id="search-form" class="search-form">
+        <div class="input-group">
+          <input
+            type="text"
+            id="search-input"
+            name="q"
+            placeholder={t("search.input_placeholder")}
+            required
+            class="search-input"
+          />
+          <select id="search-type" name="type" class="search-select">
+            <option value="all">{t("search.type_all")}</option>
+            <option value="books">{t("search.type_books")}</option>
+            <option value="surah">{t("search.type_surah")}</option>
+            <option value="cards">{t("search.type_cards")}</option>
+          </select>
+          <button type="submit" class="search-button">
+            {t("search.button")}
+          </button>
+        </div>
+      </form>
+      <div id="search-stats" class="search-stats"></div>
+    </div>
+
+    <div id="results-container" class="results-container">
+      <!-- Results will be injected here -->
+    </div>
+  </main>
+</Layout>
+
+<script is:inline define:vars={{ lang }}>
+  // Simple client-side translations or pass them from server
+  const messages = {
+    ar: {
+      found: 'تم العثور على {total} نتيجة لـ "{query}"',
+      no_results: 'لم يتم العثور على نتائج لـ "{query}".',
+      loading: "جارٍ التحميل...",
+      error: "حدث خطأ أثناء جلب النتائج. يرجى التأكد من أن النظام يعمل.",
+      next: "التالي ←",
+      prev: "→ السابق",
+      book: "كتاب",
+      book_content: "محتوى كتاب",
+      surah: "سورة",
+      aya: "آية",
+      card: "بطاقة",
+      card_content: "محتوى بطاقة",
+    },
+    en: {
+      found: 'Found {total} results for "{query}"',
+      no_results: 'No results found for "{query}".',
+      loading: "Loading...",
+      error:
+        "An error occurred while fetching results. Please ensure the system is running.",
+      next: "Next →",
+      prev: "← Previous",
+      book: "Book",
+      book_content: "Book Content",
+      surah: "Surah",
+      aya: "Ayah",
+      card: "Card",
+      card_content: "Card Content",
+    },
+  };
+
+  const msg = messages[lang] || messages.en;
+
+  const sanitizeSlug = (text) => {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w-]+/g, "")
+      .replace(/--+/g, "-");
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const query = params.get("q");
+  const type = params.get("type") || "all";
+  const page = parseInt(params.get("page") || "1");
+  const limit = 10;
+
+  const searchForm = document.getElementById("search-form");
+  const searchInput = document.getElementById("search-input");
+  const searchType = document.getElementById("search-type");
+  const resultsContainer = document.getElementById("results-container");
+  const searchStats = document.getElementById("search-stats");
+
+  if (searchInput) searchInput.value = query || "";
+  if (searchType) searchType.value = type;
+
+  searchForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData(searchForm);
+    const newQ = formData.get("q");
+    const newType = formData.get("type");
+    const baseUrl = lang === "ar" ? "/search" : `/${lang}/search`;
+    window.location.href = `${baseUrl}?q=${encodeURIComponent(newQ)}&type=${newType}`;
+  });
+
+  const buildUrl = (item) => {
+    const prefix = lang === "ar" ? "" : `/${lang}`;
+    switch (item.type) {
+      case "book":
+        return `${prefix}/books/${sanitizeSlug(item.slug)}`;
+      case "book_content":
+        const langPart =
+          item.language && item.language !== "ar" ? `/${item.language}` : "";
+        return `${prefix}/books/${sanitizeSlug(item.slug)}${langPart}#phrase-${item.phrase_id}`;
+      case "surah":
+        return `${prefix}/quran/${item.id}`;
+      case "aya":
+        return `${prefix}/quran/${item.id}#aya-${item.aya_no}`;
+      case "card":
+        return `${prefix}/cards/${sanitizeSlug(item.slug)}`;
+      case "card_content":
+        const anchor = item.section_key
+          ? `#${item.section_key.toLowerCase().replace(/\s+/g, "-")}`
+          : "";
+        return `${prefix}/cards/${sanitizeSlug(item.slug)}${anchor}`;
+      default:
+        return item.url || "/";
+    }
+  };
+
+  const renderPagination = (totalPages, currentPage) => {
+    if (totalPages <= 1) return "";
+
+    const getPageUrl = (p) => {
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.set("page", p.toString());
+      const baseUrl = lang === "ar" ? "/search" : `/${lang}/search`;
+      return `${baseUrl}?${newParams.toString()}`;
+    };
+
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + maxPagesToShow - 1);
+
+    if (end - start + 1 < maxPagesToShow) {
+      start = Math.max(1, end - maxPagesToShow + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      pageNumbers.push(i);
+    }
+
+    let html = '<nav class="pagination">';
+    if (currentPage > 1) {
+      html += `<a href="${getPageUrl(currentPage - 1)}" class="page-link">${msg.next}</a>`;
+    }
+    html += '<div class="page-numbers">';
+    pageNumbers.forEach((p) => {
+      html += `<a href="${getPageUrl(p)}" class="page-link ${currentPage === p ? "active" : ""}">${p}</a>`;
+    });
+    html += "</div>";
+    if (currentPage < totalPages) {
+      html += `<a href="${getPageUrl(currentPage + 1)}" class="page-link">${msg.prev}</a>`;
+    }
+    html += "</nav>";
+    return html;
+  };
+
+  const renderResults = (data) => {
+    const { results, total, totalPages } = data;
+    if (searchStats) {
+      searchStats.textContent = msg.found
+        .replace("{total}", total)
+        .replace("{query}", query);
+    }
+    if (results.length === 0) {
+      resultsContainer.innerHTML = `<p class="no-results">${msg.no_results.replace("{query}", query)}</p>`;
+      return;
+    }
+
+    const listHtml = `
+      <ul class="results-list">
+        ${results
+          .map((item) => {
+            const href = buildUrl(item);
+            const typeLabel = msg[item.type] || item.type.replace("_", " ");
+            return `
+              <li class="result-item">
+                <div class="result-badges">
+                  <span class="badge badge-${item.type}">${typeLabel}</span>
+                  ${item.language ? `<span class="badge badge-lang">${item.language.toUpperCase()}</span>` : ""}
+                </div>
+                <h2><a href="${href}">${item.title}</a></h2>
+                <p>${item.description || ""}</p>
+              </li>
+            `;
+          })
+          .join("")}
+      </ul>
+      ${renderPagination(totalPages, page)}
+    `;
+    resultsContainer.innerHTML = listHtml;
+  };
+
+  if (query) {
+    if (resultsContainer)
+      resultsContainer.innerHTML = `<p class="loading">${msg.loading}</p>`;
+    fetch(
+      `http://localhost:4000/api/search?q=${encodeURIComponent(query)}&type=${type}&page=${page}&limit=${limit}`,
+    )
+      .then((res) => res.json())
+      .then((data) => renderResults(data))
+      .catch((e) => {
+        if (resultsContainer)
+          resultsContainer.innerHTML = `<p class="error-message">${msg.error}</p>`;
+      });
+  }
+</script>
+
+<style>
+  .search-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px;
+    min-height: 80vh;
+  }
+  .search-header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+  h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 30px;
+    color: var(--primary-green);
+  }
+  .search-form {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .input-group {
+    display: flex;
+    width: 100%;
+    max-width: 700px;
+    background: white;
+    padding: 8px;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.05);
+    border: 2px solid rgba(6, 78, 59, 0.05);
+    transition: all 0.3s;
+  }
+  .input-group:focus-within {
+    border-color: var(--accent-gold);
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px -10px rgba(6, 78, 59, 0.1);
+  }
+  .search-input {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    font-size: 1.1rem;
+    outline: none;
+    color: var(--primary-green);
+    background: transparent;
+  }
+  .search-select {
+    padding: 0 20px;
+    border: none;
+    border-right: 1px solid #e2e8f0;
+    outline: none;
+    cursor: pointer;
+    background: transparent;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .search-button {
+    background: var(--primary-green);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .search-button:hover {
+    background: var(--emerald-deep);
+  }
+  .search-stats {
+    font-size: 1rem;
+    color: #64748b;
+    margin-top: 10px;
+  }
+
+  /* Global styles for dynamic content */
+  :global(.results-list) {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  :global(.result-item) {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    border: 1px solid rgba(6, 78, 59, 0.05);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  :global(.result-item:hover) {
+    border-color: var(--accent-gold);
+    transform: translateX(-5px);
+    box-shadow: 0 10px 20px -5px rgba(6, 78, 59, 0.05);
+  }
+  :global(.result-badges) {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  :global(.result-item h2) {
+    margin: 10px 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  :global(.result-item h2 a) {
+    color: var(--primary-green);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  :global(.result-item h2 a:hover) {
+    color: var(--emerald-deep);
+  }
+  :global(.result-item p) {
+    color: #4b5563;
+    line-height: 1.8;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  :global(.badge) {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  :global(.badge-book) {
+    background: #ecfdf5;
+    color: #065f46;
+  }
+  :global(.badge-surah) {
+    background: #fffbeb;
+    color: #92400e;
+  }
+  :global(.badge-card) {
+    background: #eff6ff;
+    color: #1e40af;
+  }
+  :global(.badge-lang) {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  :global(.pagination) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 50px;
+    padding-top: 30px;
+    border-top: 1px solid #e2e8f0;
+  }
+  :global(.page-numbers) {
+    display: flex;
+    gap: 10px;
+  }
+  :global(.page-link) {
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    text-decoration: none;
+    color: #4b5563;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+  :global(.page-link:hover) {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+  }
+  :global(.page-link.active) {
+    background: var(--primary-green);
+    color: white;
+    border-color: var(--primary-green);
+  }
+
+  :global(.no-results),
+  :global(.error-message),
+  :global(.loading) {
+    text-align: center;
+    color: #64748b;
+    padding: 60px;
+    font-size: 1.2rem;
+    background: white;
+    border-radius: 20px;
+    margin-top: 40px;
+  }
+</style>
