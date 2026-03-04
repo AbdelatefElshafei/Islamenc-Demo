@@ -1,0 +1,482 @@
+---
+import Layout from "../../../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../../../i18n/utils";
+import { sanitizeSlug } from "../../../../utils/slugs";
+import QRCode from "qrcode";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/with-languages`,
+  );
+  if (!response.ok) return [];
+  const books = await response.json();
+  if (!Array.isArray(books)) return [];
+
+  const paths = [];
+  const superBooks = books.filter((b) => b.type === "superbook");
+
+  for (const book of superBooks) {
+    if (book.available_languages) {
+      for (const langObj of book.available_languages) {
+        if (langObj.iso !== "ar") {
+          paths.push({
+            params: {
+              slug: sanitizeSlug(book.slug),
+              lang: langObj.iso,
+            },
+            props: { bookSlug: book.slug },
+          });
+        }
+      }
+    }
+  }
+
+  return paths;
+}
+
+const { slug, lang: urlLang } = Astro.params;
+const { bookSlug } = Astro.props;
+const lang = urlLang || getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+const lookupSlug = bookSlug || slug;
+
+let book = null;
+let qrDataUrl = "";
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/slug/${encodeURIComponent(lookupSlug || "")}`,
+  );
+  if (response.ok) {
+    book = await response.json();
+
+    // Generate QR Code for the current page URL
+    const currentUrl = Astro.url.href;
+    qrDataUrl = await QRCode.toDataURL(currentUrl, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: "#064e3b",
+        light: "#ffffff",
+      },
+    });
+  }
+} catch (e) {
+  console.error("Error fetching book:", e);
+}
+
+if (!book) return Astro.redirect("/404");
+
+const alternates = (book.available_languages || []).map((l: any) => ({
+  lang: l.iso,
+  href:
+    l.iso === "ar"
+      ? `/books/special/${slug}`
+      : `/books/special/${slug}/${l.iso}`,
+}));
+---
+
+<Layout
+  title={`${book.title} - ${t("books.selected")}`}
+  alternates={alternates}
+>
+  <main class="special-book-page">
+    <div class="special-container">
+      <!-- Hero Header Card -->
+      <section class="hero-card glass-card">
+        <div class="badge-row">
+          <span class="badge">{t("books.selected")}</span>
+          <div class="qr-float">
+            <img
+              src={qrDataUrl}
+              alt="QR Code"
+              class="qr-thumbnail"
+              id="qr-trigger"
+            />
+            <div class="qr-tooltip glass-card">
+              <img src={qrDataUrl} alt="QR Code Full" />
+              <p>{t("books.scan_qr")}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-content">
+          <h1>{book.title}</h1>
+          {
+            book.description && (
+              <p class="description-small">{book.description}</p>
+            )
+          }
+
+          <div class="hero-actions">
+            <a
+              href={translatePath(`/books/${sanitizeSlug(book.slug)}`)}
+              class="read-button"
+            >
+              <span class="read-icon">📖</span>
+              {t("books.read")}
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <div class="multimedia-grid">
+        <!-- Video Section -->
+        {
+          book.mp4Links && book.mp4Links.length > 0 && (
+            <section class="media-card glass-card">
+              <div class="card-header">
+                <span class="icon-circle video">🎬</span>
+                <h3>{t("books.video")}</h3>
+              </div>
+              <div class="links-stack">
+                {book.mp4Links.map((link: string, index: number) => (
+                  <a href={link} target="_blank" class="media-link">
+                    <div class="link-label">
+                      <span class="play-icon">▶</span>
+                      {lang === "ar"
+                        ? `المقطع المرئي ${index + 1}`
+                        : `Video Clip ${index + 1}`}
+                    </div>
+                    <span class="external-icon">↗</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )
+        }
+
+        <!-- Audio Section -->
+        {
+          book.mp3Links && book.mp3Links.length > 0 && (
+            <section class="media-card glass-card">
+              <div class="card-header">
+                <span class="icon-circle audio">🔊</span>
+                <h3>{t("books.audio")}</h3>
+              </div>
+              <div class="links-stack">
+                {book.mp3Links.map((link: string, index: number) => (
+                  <a href={link} target="_blank" class="media-link">
+                    <div class="link-label">
+                      <span class="play-icon">♫</span>
+                      {lang === "ar"
+                        ? `المقطع الصوتي ${index + 1}`
+                        : `Audio Clip ${index + 1}`}
+                    </div>
+                    <span class="external-icon">↗</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )
+        }
+
+        <!-- Additional Links -->
+        {
+          book.extraLinks && book.extraLinks.length > 0 && (
+            <section class="media-card glass-card full-width">
+              <div class="card-header">
+                <span class="icon-circle extra">🔗</span>
+                <h3>{t("books.special_links")}</h3>
+              </div>
+              <div class="links-row">
+                {book.extraLinks.map((linkObj: any) => (
+                  <a href={linkObj.url} target="_blank" class="media-link chip">
+                    {linkObj.label || linkObj.url}
+                    <span class="external-icon">↗</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )
+        }
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .special-book-page {
+    min-height: 100vh;
+    padding: 7rem 2rem 4rem;
+    background:
+      radial-gradient(
+        circle at 0% 0%,
+        rgba(212, 175, 55, 0.08) 0%,
+        transparent 40%
+      ),
+      radial-gradient(
+        circle at 100% 100%,
+        rgba(6, 78, 59, 0.05) 0%,
+        transparent 40%
+      ),
+      #fdfdfd;
+  }
+
+  .special-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.02),
+      0 1px 3px rgba(0, 0, 0, 0.01);
+    border-radius: 32px;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  /* Hero Card */
+  .hero-card {
+    padding: 3.5rem;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    background: linear-gradient(135deg, #ffffff 0%, #f9fbf9 100%);
+    border: 1px solid rgba(6, 78, 59, 0.08);
+  }
+
+  .badge-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .badge {
+    background: var(--primary-green);
+    color: white;
+    padding: 6px 20px;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .qr-float {
+    position: absolute;
+    right: 0;
+    top: -10px;
+  }
+
+  .qr-thumbnail {
+    width: 60px;
+    height: 60px;
+    cursor: pointer;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s;
+  }
+
+  .qr-thumbnail:hover {
+    transform: scale(1.1);
+  }
+
+  .qr-tooltip {
+    position: absolute;
+    top: 70px;
+    right: 0;
+    width: 200px;
+    padding: 1rem;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    text-align: center;
+  }
+
+  .qr-float:hover .qr-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .qr-tooltip img {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .qr-tooltip p {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    color: var(--primary-green);
+    font-weight: 900;
+    margin-bottom: 1.25rem;
+    line-height: 1.3;
+  }
+
+  .description-small {
+    font-size: 0.95rem;
+    color: #64748b;
+    max-width: 800px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.6;
+    opacity: 0.8;
+  }
+
+  .hero-actions {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Multimedia Grid */
+  .multimedia-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+  }
+
+  .media-card {
+    padding: 2.5rem;
+  }
+
+  .full-width {
+    grid-column: span 2;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+  }
+
+  .icon-circle.video {
+    background: rgba(239, 68, 68, 0.1);
+  }
+  .icon-circle.audio {
+    background: rgba(59, 130, 246, 0.1);
+  }
+  .icon-circle.extra {
+    background: rgba(212, 175, 55, 0.1);
+  }
+
+  .card-header h3 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0;
+  }
+
+  .links-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .media-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    background: #f8fafc;
+    border-radius: 18px;
+    text-decoration: none;
+    color: #334155;
+    font-weight: 700;
+    transition: all 0.3s;
+    border: 1px solid rgba(0, 0, 0, 0.02);
+  }
+
+  .media-link:hover {
+    background: white;
+    transform: translateX(8px);
+    border-color: var(--accent-gold);
+    color: var(--primary-green);
+    box-shadow: 0 10px 25px -5px rgba(212, 175, 55, 0.15);
+  }
+
+  .link-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .play-icon {
+    font-size: 0.8rem;
+    opacity: 0.4;
+  }
+
+  .links-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .media-link.chip {
+    padding: 0.75rem 1.5rem;
+    border-radius: 100px;
+  }
+
+  /* Buttons */
+  .read-button {
+    background: linear-gradient(
+      135deg,
+      var(--primary-green) 0%,
+      var(--emerald-deep) 100%
+    );
+    color: white;
+    padding: 1.25rem 3.5rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 1.3rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 15px 35px rgba(6, 78, 59, 0.25);
+    transition: all 0.4s;
+  }
+
+  .read-button:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 20px 45px rgba(6, 78, 59, 0.35);
+  }
+
+  @media (max-width: 850px) {
+    .multimedia-grid {
+      grid-template-columns: 1fr;
+    }
+    .full-width {
+      grid-column: span 1;
+    }
+    .hero-card {
+      padding: 2.5rem 1.5rem;
+    }
+    .qr-float {
+      display: none;
+    }
+  }
+</style>
