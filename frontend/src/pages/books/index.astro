@@ -1,0 +1,205 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../i18n/utils";
+import { sanitizeSlug } from "../../utils/slugs";
+
+export const prerender = true;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+let books: any[] = [];
+let error: string | null = null;
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/books/with-languages`,
+  );
+  if (response.ok) {
+    books = await response.json();
+  } else {
+    error = lang === "ar" ? "فشل في تحميل الكتب" : "Failed to load books";
+  }
+} catch (e) {
+  error = lang === "ar" ? "النظام لا يستجيب" : "System not responding";
+}
+---
+
+<Layout title={`${t("nav.library")} - ${t("hero.title_span")}`}>
+  <main class="container">
+    <header class="header">
+      <h1>{t("nav.library")}</h1>
+      <p>{t("books.description")}</p>
+    </header>
+
+    {error && <p class="error">{error}</p>}
+
+    <div class="books-grid">
+      {
+        books
+          .filter((b) => b.type !== "superbook")
+          .map((book) => (
+            <a
+              href={translatePath(`/books/${sanitizeSlug(book.slug)}`)}
+              class="book-card"
+            >
+              <div class="book-info">
+                <h2>{book.title}</h2>
+                {book.description && (
+                  <p>{book.description.substring(0, 150)}...</p>
+                )}
+              </div>
+            </a>
+          ))
+      }
+    </div>
+  </main>
+</Layout>
+
+<style
+  define:vars={{
+    textAlign: Astro.url.pathname.startsWith("/en") ? "left" : "right",
+  }}
+>
+  .container {
+    max-width: 1400px;
+    margin: 60px auto;
+    padding: 0 20px;
+    min-height: 70vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+  h1 {
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
+    color: var(--primary-green);
+    margin-bottom: 12px;
+    font-weight: 800;
+  }
+  .header p {
+    font-size: 1.25rem;
+    color: #4b5563;
+  }
+  .books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 32px;
+  }
+  .book-card {
+    background: white;
+    border-radius: 20px;
+    border: 1px solid rgba(6, 78, 59, 0.05);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .book-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--accent-gold);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .book-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(6, 78, 59, 0.1);
+    border-color: var(--accent-gold);
+  }
+  .book-card:hover::before {
+    opacity: 1;
+  }
+  .book-info {
+    padding: 30px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: var(--textAlign);
+  }
+  h2 {
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+    color: var(--primary-green);
+    line-height: 1.5;
+    font-weight: 700;
+  }
+  p {
+    font-size: 1.05rem;
+    color: #4b5563;
+    margin-bottom: 24px;
+    line-height: 1.7;
+    flex: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  .languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: auto;
+    flex-direction: row;
+  }
+  .lang-badge {
+    background: rgba(6, 78, 59, 0.05);
+    color: var(--primary-green);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 1px solid rgba(6, 78, 59, 0.1);
+  }
+  .section-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+    margin-top: 4rem;
+  }
+  .section-title h2 {
+    margin-bottom: 0;
+    font-size: 2rem;
+  }
+  .ornament {
+    font-size: 1.5rem;
+  }
+  .special-section {
+    margin-bottom: 5rem;
+    padding: 2rem;
+    background: linear-gradient(
+      135deg,
+      rgba(212, 175, 55, 0.05) 0%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    border-radius: 40px;
+  }
+  .special-card {
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: linear-gradient(to bottom, #fff, #fffdf0);
+  }
+  .special-card:hover {
+    box-shadow: 0 25px 50px -12px rgba(212, 175, 55, 0.2);
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    padding: 40px;
+    background: white;
+    border-radius: 20px;
+  }
+</style>
