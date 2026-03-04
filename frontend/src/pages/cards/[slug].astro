@@ -1,0 +1,162 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getLangFromUrl, useTranslations } from "../../i18n/utils";
+import { sanitizeSlug } from "../../utils/slugs";
+
+export const prerender = true;
+
+export async function getStaticPaths() {
+  const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/cards/list`);
+  const cards = await response.json();
+
+  const locales = ["ar", "en"];
+  const paths = [];
+
+  for (const locale of locales) {
+    for (const card of cards) {
+      paths.push({
+        params: {
+          lang: locale === "ar" ? undefined : locale,
+          slug: sanitizeSlug(card.slug),
+        },
+        props: { cardSlug: card.slug, lang: locale },
+      });
+    }
+  }
+  return paths;
+}
+
+const { slug } = Astro.params;
+const { cardSlug, lang: propLang } = Astro.props;
+const lang = propLang || getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+
+const lookupSlug = cardSlug || slug;
+
+let card: any = null;
+let error: string | null = null;
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/cards/slug/${encodeURIComponent(lookupSlug)}`,
+  );
+  if (response.ok) {
+    card = await response.json();
+  } else {
+    error = lang === "ar" ? "لم يتم العثور على البطاقة" : "Card not found";
+  }
+} catch (e) {
+  error = lang === "ar" ? "فشل في تحميل البطاقة" : "Failed to load card";
+}
+
+if (!card && !error) {
+  return Astro.redirect("/404");
+}
+---
+
+<Layout
+  title={card
+    ? `${card.title} - ${t("hero.title_span")}`
+    : t("hero.title_span")}
+>
+  <main class="card-container">
+    {
+      error ? (
+        <div class="error">{error}</div>
+      ) : (
+        <article class="card-content">
+          <header class="card-header">
+            <h1>{card.title}</h1>
+          </header>
+
+          {card.latest_version ? (
+            <div class="sections">
+              {card.latest_version.contents.map((section: any) => (
+                <section
+                  class="content-section"
+                  id={
+                    section.key
+                      ? section.key.toLowerCase().replace(/\s+/g, "-")
+                      : undefined
+                  }
+                >
+                  {section.key && <h3>{section.key}</h3>}
+                  <div class="section-text">{section.value}</div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <p class="no-content">
+              {lang === "ar"
+                ? "لا يوجد محتوى متاح لهذه البطاقة."
+                : "No content available for this card."}
+            </p>
+          )}
+        </article>
+      )
+    }
+  </main>
+</Layout>
+
+<style define:vars={{ textAlign: lang === "ar" ? "right" : "left" }}>
+  .card-container {
+    max-width: 800px;
+    margin: 60px auto;
+    padding: 20px;
+    min-height: 70vh;
+  }
+  .card-header {
+    margin-bottom: 40px;
+    text-align: center;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.5rem);
+    color: var(--primary-green);
+    font-weight: 800;
+  }
+  .sections {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+  .content-section {
+    background: white;
+    padding: 40px;
+    border-radius: 24px;
+    border: 1px solid rgba(6, 78, 59, 0.05);
+    box-shadow: 0 10px 25px -10px rgba(6, 78, 59, 0.05);
+  }
+  h3 {
+    margin-top: 0;
+    font-size: 1rem;
+    color: var(--accent-gold);
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(6, 78, 59, 0.05);
+    padding-bottom: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-text {
+    font-size: 1.25rem;
+    line-height: 1.9;
+    color: var(--text-main);
+    white-space: pre-wrap;
+    text-align: var(--textAlign);
+  }
+  .no-content {
+    text-align: center;
+    color: #64748b;
+    padding: 60px;
+    background: white;
+    border-radius: 24px;
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    padding: 60px;
+    background: white;
+    border-radius: 24px;
+    font-weight: 600;
+  }
+</style>
