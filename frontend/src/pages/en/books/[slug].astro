@@ -1,0 +1,8 @@
+---
+import BookDetail from "../../books/[slug].astro";
+export const prerender = true;
+
+export { getStaticPaths } from "../../books/[slug].astro";
+---
+
+<BookDetail />
