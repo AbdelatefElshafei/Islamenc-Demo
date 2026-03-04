@@ -1,0 +1,175 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+  getLangFromUrl,
+  useTranslations,
+  useTranslatedPath,
+} from "../../i18n/utils";
+
+export const prerender = true;
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+let surahs: any[] = [];
+let error: string | null = null;
+
+try {
+  const response = await fetch(
+    `${import.meta.env.PUBLIC_API_URL}/quran/surahs`,
+  );
+  if (response.ok) {
+    surahs = await response.json();
+  } else {
+    error = lang === "ar" ? "فشل في تحميل سور القرآن" : "Failed to load Surahs";
+  }
+} catch (e) {
+  error = lang === "ar" ? "النظام لا يستجيب" : "System not responding";
+}
+---
+
+<Layout title={`${t("nav.quran")} - ${t("hero.title_span")}`}>
+  <main class="container">
+    <header class="header">
+      <h1>{t("nav.quran")}</h1>
+      <p>
+        {
+          lang === "ar"
+            ? "اقرأ وتدبر في 114 سورة من سور القرآن الكريم."
+            : "Read and ponder upon the 114 Surahs of the Holy Quran."
+        }
+      </p>
+    </header>
+
+    {error && <p class="error">{error}</p>}
+
+    <div class="surah-grid">
+      {
+        surahs.map((surah) => (
+          <a
+            href={translatePath(`/quran/${surah.surahNo}`)}
+            class="surah-card"
+            dir={lang === "ar" ? "rtl" : "ltr"}
+          >
+            <div class="surah-number-box">
+              <div class="surah-number">{surah.surahNo}</div>
+            </div>
+            <div class="surah-names">
+              <h2>{surah.surahName}</h2>
+              <span class="arabic-name">{surah.arUthmaniName}</span>
+            </div>
+            <div class="surah-meta">
+              <span>
+                {surah.ayasCount} {t("quran.ayahs")}
+              </span>
+            </div>
+          </a>
+        ))
+      }
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .container {
+    max-width: 1400px;
+    margin: 60px auto;
+    padding: 0 20px;
+    min-height: 70vh;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+  h1 {
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
+    color: var(--primary-green);
+    margin-bottom: 12px;
+    font-weight: 800;
+  }
+  .header p {
+    font-size: 1.25rem;
+    color: #4b5563;
+  }
+  .surah-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+  }
+  .surah-card {
+    background: white;
+    padding: 24px;
+    border-radius: 20px;
+    border: 1px solid rgba(6, 78, 59, 0.05);
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .surah-card:hover {
+    border-color: var(--accent-gold);
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.08);
+  }
+  .surah-number-box {
+    width: 60px;
+    height: 60px;
+    background: rgba(6, 78, 59, 0.05);
+    border: 1px solid rgba(6, 78, 59, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .surah-card:hover .surah-number-box {
+    background: var(--primary-green);
+    color: white;
+    transform: scale(1.1);
+  }
+  .surah-number {
+    font-weight: 800;
+    color: var(--primary-green);
+    font-size: 1.25rem;
+    transition: color 0.3s;
+  }
+  .surah-card:hover .surah-number {
+    color: white;
+  }
+  .surah-names {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  h2 {
+    font-size: 1.25rem;
+    margin: 0;
+    color: var(--primary-green);
+    font-weight: 700;
+  }
+  .arabic-name {
+    display: block;
+    font-size: 1.6rem;
+    color: #475569;
+    font-family: "Amiri", serif;
+    line-height: 1.2;
+  }
+  .surah-meta {
+    font-size: 0.9rem;
+    color: var(--accent-gold);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .error {
+    text-align: center;
+    color: #ef4444;
+    padding: 40px;
+    background: white;
+    border-radius: 20px;
+  }
+</style>
